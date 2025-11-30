@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SIMS</title>
+
+    <!-- Website favicon -->
+    <link rel="icon" type="image/png" href="assets/img/SIMS_logo_white_bg.png">
+
+    <link rel="stylesheet" href="assets/styles/style.css">
+</head>
+
+
+<body>
+    <header class="top">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <!-- Logo image -->
+            <img src="assets/img/SIMS_logo.png" alt="Dashboard Logo" style="height:60px; width:auto;">
+
+            <!-- Title next to logo -->
+            <div>
+                <h1>Shipment Inspection Monitoring System</h1>
+                <p class="muted">Local, runs in your browser. Place Excel files in <code>/data</code> or upload
+                    manually.</p>
+            </div>
+        </div>
+
+        <div class="actions">
+            <label class="btn">
+                <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" multiple /> Upload file(s)
+            </label>
+            <button id="exportCsv" class="btn">Export Current (Excel)</button>
+        </div>
+    </header>
+
+
+    <main class="container">
+        <section class="controls card">
+            <div class="filters">
+                <label>Factory
+                    <select id="factoryFilter">
+                        <option value="all">All</option>
+                    </select>
+                </label>
+
+                <label>Container
+                    <select id="containerFilter">
+                        <option value="all">All</option>
+                    </select>
+                </label>
+
+                <label>Status
+                    <select id="statusFilter">
+                        <option value="all">All</option>
+                        <option value="Finished">Finished</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Not Started">Not Started</option>
+                        <option value="Remaining">Remaining</option>
+                    </select>
+                </label>
+
+                <label class="search">Search
+                    <input id="searchInput" placeholder="search box number, product, etc" />
+                </label>
+
+                <div class="rows">Rows: <span id="rowsCount">0</span></div>
+            </div>
+
+            <!-- New small cards for multipack / normal -->
+            <div class="summary" id="summaryWrap"></div>
+
+            <div style="display:flex; gap:10px; margin-top:10px; align-items:center; width:100%;">
+                <div class="card small-stat" id="multipackCard" style="cursor:pointer">
+                    <strong>Multi-pack boxes</strong>
+                    <div id="multipackCount" class="big">0</div>
+                    <div class="muted">ItemCount > 1 (click to filter)</div>
+                </div>
+
+                <div class="card small-stat" id="normalPackCard" style="cursor:pointer">
+                    <strong>Normal boxes</strong>
+                    <div id="normalCount" class="big">0</div>
+                    <div class="muted">ItemCount = 1 (click to filter)</div>
+                </div>
+
+                <!-- <div id="inProgressCard" class="card small-stat" style="cursor:pointer">
+                    <strong>In Progress</strong>
+                    <div id="inprogressCount" class="big">0</div>
+                    <div class="muted">Currently in progress</div>
+                </div>
+
+                <div id="notStartedCard" class="card small-stat" style="cursor:pointer">
+                    <strong>Not Started</strong>
+                    <div id="notStartedCount" class="big">0</div>
+                    <div class="muted">Not started yet</div>
+                </div> -->
+            </div>
+
+        </section>
+
+
+        <label>Apply Remark:
+            <select id="applyRemark">
+                <option value="">--Select--</option>
+                <option value="Done">Done</option>
+                <option value="in progress">In Progress</option>
+                <option value="">Clear</option>
+            </select>
+            <button id="applyAllBtn" class="btn">Apply to All</button>
+        </label>
+
+
+        <section id="table-wrap" class="card">
+            <table id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </section>
+
+        <section class="cards">
+            <div class="card">
+                <canvas id="progressChart" height="200"></canvas>
+            </div>
+            <div class="card">
+                <canvas id="boxesByContainerChart" height="220"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <!-- Libraries (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- App script -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="assets/scripts/app.js"></script>
+</body>
+
+</html>
