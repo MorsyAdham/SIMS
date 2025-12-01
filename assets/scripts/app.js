@@ -372,6 +372,7 @@ function renderFilteredAndLive() {
   rowsCount.textContent = filtered.length;
 }
 
+
 function renderTable(rows) {
   tableHead.innerHTML = '';
   tableBody.innerHTML = '';
@@ -473,7 +474,7 @@ applyAllBtn.addEventListener('click', () => {
   if (!activeKey) return;
   const val = applyRemarkSelect.value;
   const allRows = files[activeKey].rows || [];
-  // only visible rows
+
   const fFactory = factoryFilter.value || 'all';
   const fContainer = containerFilter.value || 'all';
   const fStatus = statusFilter.value || 'all';
@@ -481,28 +482,105 @@ applyAllBtn.addEventListener('click', () => {
 
   allRows.forEach(r => {
     let visible = true;
-    if (fFactory !== 'all' && String(r.Factory ?? '') !== fFactory) visible = false;
-    if (fContainer !== 'all' && String(r.ContainerNum ?? '') !== fContainer) visible = false;
-    if (q && !Object.values(r).join(' ').toLowerCase().includes(q)) visible = false;
 
+    // Factory
+    if (fFactory !== 'all' && String(r.Factory ?? '') !== fFactory)
+      visible = false;
+
+    // Container
+    if (fContainer !== 'all' && String(r.ContainerNum ?? '') !== fContainer)
+      visible = false;
+
+    // Status: SAME LOGIC as renderFilteredAndLive()
+    const rem = String(r.REMARKS ?? '').toLowerCase();
+    const isDone = /done/i.test(rem);
+    const isInProg = /(in progress|inprogress)/i.test(rem);
+    const isNotStarted = rem.trim() === '' || /(not started|n\/a|na)/i.test(rem);
+
+    if (fStatus === 'Finished' && !isDone) visible = false;
+    if (fStatus === 'In Progress' && !isInProg) visible = false;
+    if (fStatus === 'Not Started' && !isNotStarted) visible = false;
+    if (fStatus === 'Remaining' && isDone) visible = false;
+
+    // Search filter
+    if (q && !Object.values(r).join(' ').toLowerCase().includes(q))
+      visible = false;
+
+    // Apply update only to visible rows
     if (visible) r.REMARKS = val;
   });
+
   saveFileToLocalStorage(activeKey);
   renderFilteredAndLive();
 });
 
 
+function classifyStatus(remarks) {
+  const rem = String(remarks ?? '').trim().toLowerCase();
+
+  // Completed
+  if (/done/i.test(rem)) return 'Completed';
+
+  // In Progress
+  if (/in\s*progress/i.test(rem)) return 'In Progress';
+
+  // Not Started
+  if (rem === '' || /^(n\/a|na|not started)$/i.test(rem)) return 'Not Started';
+
+  return 'Not Started';
+}
+
 function renderSummary(rows) {
   const total = rows.length;
-  const finished = rows.filter(r => isCompleted(r.REMARKS)).length;
-  const remaining = Math.max(0, total - finished);
-  const percent = total === 0 ? 0 : Math.round((finished / total) * 100);
+
+  let completed = 0;
+  let inProgress = 0;
+  let notStarted = 0;
+
+  rows.forEach(r => {
+    const s = classifyStatus(r.REMARKS);
+    if (s === 'Completed') completed++;
+    else if (s === 'In Progress') inProgress++;
+    else if (s === 'Not Started') notStarted++;
+  });
+
+  // Remaining = In Progress + Not Started
+  const remaining = inProgress + notStarted;
+
+  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+
 
   summaryWrap.innerHTML = `
-    <div class="card"><strong>Total boxes</strong><div class="big">${total}</div><div class="muted">Rows</div></div>
-    <div class="card"><strong>Completed</strong><div class="big">${finished}</div><div class="muted">Percent: ${percent}%</div></div>
-    <div class="card"><strong>Remaining</strong><div class="big">${remaining}</div><div class="muted">To inspect</div></div>
-  `;
+  <div class="card">
+    <strong>Total Boxes</strong>
+    <div class="big">${total}</div>
+    <div class="muted">All rows</div>
+  </div>
+
+  <div class="card">
+    <strong>Completed</strong>
+    <div class="big">${completed}</div>
+    <div class="muted">Finished (${percent}%)</div>
+  </div>
+
+  <div class="card">
+    <strong>In Progress</strong>
+    <div class="big">${inProgress}</div>
+    <div class="muted">Under inspection</div>
+  </div>
+
+  <div class="card">
+    <strong>Not Started</strong>
+    <div class="big">${notStarted}</div>
+    <div class="muted">Not yet inspected</div>
+  </div>
+
+  <div class="card">
+    <strong>Remaining</strong>
+    <div class="big">${remaining}</div>
+    <div class="muted">In Progress + Not Started</div>
+  </div>
+`;
 }
 
 // rows parameter is filtered rows for counting multipack/normal
@@ -672,65 +750,62 @@ function renderCharts(rows) {
 
 
 // ---------------------- Export / Download ----------------------
-
 function exportWorkbookWithAnalytics(key) {
   const entry = files[key];
   if (!entry) return;
 
   // -----------------------------
-  // 1) MAIN DATA SHEET (unchanged)
+  // 1) DATA SHEET
   // -----------------------------
   const dataRows = entry.rows.map(r => {
     const out = {};
-    EXPECTED_COLS.forEach(c => out[c] = r[c] ?? '');
-    Object.keys(r).forEach(k => {
-      if (!EXPECTED_COLS.includes(k)) out[k] = r[k];
-    });
+    EXPECTED_COLS.forEach(c => out[c] = r[c] ?? "");
+    Object.keys(r).forEach(k => { if (!EXPECTED_COLS.includes(k)) out[k] = r[k]; });
     return out;
   });
   const wsData = XLSX.utils.json_to_sheet(dataRows);
 
   // -----------------------------
-  // 2) MAIN ANALYTICS (same as before)
+  // ANALYTICS BUILDER
   // -----------------------------
   function buildAnalytics(rows) {
     const byContainer = {};
 
     rows.forEach(r => {
-      const cont = String(r.ContainerNum ?? 'NA');
-      if (!byContainer[cont]) byContainer[cont] = { total: 0, finished: 0, remaining: 0 };
+      const cont = String(r.ContainerNum ?? "NA");
+      if (!byContainer[cont]) byContainer[cont] = { total: 0, finished: 0 };
       byContainer[cont].total++;
-
       if (isCompleted(r.REMARKS)) byContainer[cont].finished++;
-      else byContainer[cont].remaining++;
     });
 
-    let total = 0, totalFinished = 0, totalRemaining = 0;
     const out = [];
+    let total = 0, finished = 0;
 
     Object.keys(byContainer).sort().forEach(cont => {
       const v = byContainer[cont];
+      const remaining = v.total - v.finished;
+      const pct = v.total === 0 ? 0 : Math.round((v.finished / v.total) * 100);
+
       out.push({
         Container: cont,
         TotalBoxes: v.total,
         Finished: v.finished,
-        Remaining: v.remaining,
-        CompletionPercent:
-          v.total === 0 ? 0 : Math.round((v.finished / v.total) * 100)
+        Remaining: remaining,
+        CompletionPercent: pct + "%"
       });
 
       total += v.total;
-      totalFinished += v.finished;
-      totalRemaining += v.remaining;
+      finished += v.finished;
     });
 
+    // ALL ROW
+    const pctAll = total === 0 ? 0 : Math.round((finished / total) * 100);
     out.push({
-      Container: 'ALL',
+      Container: "ALL",
       TotalBoxes: total,
-      Finished: totalFinished,
-      Remaining: totalRemaining,
-      CompletionPercent:
-        total === 0 ? 0 : Math.round((totalFinished / total) * 100)
+      Finished: finished,
+      Remaining: total - finished,
+      CompletionPercent: pctAll + "%"
     });
 
     return XLSX.utils.json_to_sheet(out);
@@ -739,32 +814,96 @@ function exportWorkbookWithAnalytics(key) {
   const wsAnalytics = buildAnalytics(entry.rows);
 
   // -----------------------------
-  // 3) FACTORY-SPLIT ANALYTICS
+  // FACTORY ORDER
   // -----------------------------
+  const factoryOrder = ["F200", "F100", "AIO"];
   const factories = [...new Set(entry.rows.map(r => r.Factory || "UNKNOWN"))];
 
-  // Create workbook
+  // -----------------------------
+  // SUMMARY SHEET (UPDATED)
+  // -----------------------------
+  function buildSummarySheet() {
+    const summaryData = [];
+
+    let allTotal = 0,
+      allFinished = 0;
+
+    factoryOrder.forEach(fac => {
+      const filtered = entry.rows.filter(r => r.Factory === fac);
+      if (filtered.length === 0) return;
+
+      const total = filtered.length;
+      const finished = filtered.filter(r => isCompleted(r.REMARKS)).length;
+      const pct = total === 0 ? 0 : Math.round((finished / total) * 100);
+
+      summaryData.push({
+        Factory: fac,
+        TotalBoxes: total,
+        Completed: finished,
+        Remaining: total - finished,
+        CompletionPercent: pct + "%"
+      });
+
+      allTotal += total;
+      allFinished += finished;
+    });
+
+    // ---- ALL FACTORIES ROW ----
+    const pctAll = allTotal === 0 ? 0 : Math.round((allFinished / allTotal) * 100);
+
+    summaryData.push({
+      Factory: "ALL",
+      TotalBoxes: allTotal,
+      Completed: allFinished,
+      Remaining: allTotal - allFinished,
+      CompletionPercent: pctAll + "%"
+    });
+
+    // Build sheet
+    const ws = XLSX.utils.json_to_sheet(summaryData, { origin: "A2" });
+
+    // ---- Merged Title Cell ----
+    ws["A1"] = { t: "s", v: "Shipment Inspection Summary" };
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+
+    // ---- Column Widths ----
+    ws["!cols"] = [
+      { wch: 12 },  // Factory
+      { wch: 12 },  // TotalBoxes
+      { wch: 12 },  // Completed
+      { wch: 12 },  // Remaining
+      { wch: 18 }   // CompletionPercent
+    ];
+
+    return ws;
+  }
+
+  const wsSummary = buildSummarySheet();
+
+  // -----------------------------
+  // BUILD WORKBOOK
+  // -----------------------------
   const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsData, "Data");
+  XLSX.utils.book_append_sheet(wb, wsAnalytics, "Analytics");
 
-  // Data + Main Analytics
-  XLSX.utils.book_append_sheet(wb, wsData, 'Data');
-  XLSX.utils.book_append_sheet(wb, wsAnalytics, 'Analytics');
-
-  // For each factory, create same analytics sheet but filtered
   factories.forEach(fac => {
     const filtered = entry.rows.filter(r => r.Factory === fac);
     const ws = buildAnalytics(filtered);
-
-    const safeName = `Analytics_${fac}`.replace(/[^a-zA-Z0-9_]/g, "");
-    XLSX.utils.book_append_sheet(wb, ws, safeName);
+    const safe = `Analytics_${fac}`.replace(/[^A-Za-z0-9_]/g, "");
+    XLSX.utils.book_append_sheet(wb, ws, safe);
   });
 
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
   // -----------------------------
-  // 4) SAVE FILE
+  // SAVE FILE
   // -----------------------------
-  const outName = `${entry.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '')}_${nowTimestampForName()}.xlsx`;
+  const outName =
+    `${entry.name.replace(/\s+/g, '_')}_${nowTimestampForName()}.xlsx`;
   XLSX.writeFile(wb, outName);
 }
+
 
 // export active
 exportBtn.addEventListener('click', () => {

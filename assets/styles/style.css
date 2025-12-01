@@ -142,6 +142,64 @@ select option[disabled] {
     color: #999;
 }
 
+.searchable-select {
+    position: relative;
+    width: 200px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    padding: 6px 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.searchable-select input.search-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+}
+
+.dropdown-icon {
+    margin-left: 6px;
+    color: orange;
+    font-weight: bold;
+    pointer-events: none;
+}
+
+.options {
+    position: absolute;
+    top: 105%;
+    left: 0;
+    width: 100%;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 99;
+    padding: 8px 0;
+}
+
+.options div {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.options div:hover {
+    background: rgba(255,165,0,0.2);
+}
+
+/* Hide options initially */
+.hidden {
+    display: none;
+}
+
+
 
 .search input {
     min-width: 1.5rem;
